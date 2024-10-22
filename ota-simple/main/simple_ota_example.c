@@ -31,49 +31,12 @@
 
 // Define the GPIO pin for the button and LED
 #define GPIO_BUTTON_PIN 0  // Button pin, GPIO0
-#define GPIO_LED_PIN 21     // LED pin, GPIO33
+#define GPIO_LED_PIN 33     // LED pin, GPIO33
 
 static const char *TAG = "simple_ota_example";
 extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
 
-
-/* Event handler for catching system events */
-static void _https_ota_event_handler(void* arg, esp_event_base_t event_base,
-                        int32_t event_id, void* event_data)
-{
-    if (event_base == ESP_HTTPS_OTA_EVENT) {
-        switch (event_id) {
-            case ESP_HTTPS_OTA_START:
-                ESP_LOGI(TAG, "OTA started");
-                break;
-            case ESP_HTTPS_OTA_CONNECTED:
-                ESP_LOGI(TAG, "Connected to server");
-                break;
-            case ESP_HTTPS_OTA_GET_IMG_DESC:
-                ESP_LOGI(TAG, "Reading Image Description");
-                break;
-            case ESP_HTTPS_OTA_VERIFY_CHIP_ID:
-                ESP_LOGI(TAG, "Verifying chip id of new image: %d", *(esp_chip_id_t *)event_data);
-                break;
-            case ESP_HTTPS_OTA_DECRYPT_CB:
-                ESP_LOGI(TAG, "Callback to decrypt function");
-                break;
-            case ESP_HTTPS_OTA_WRITE_FLASH:
-                ESP_LOGD(TAG, "Writing to flash: %d written", *(int *)event_data);
-                break;
-            case ESP_HTTPS_OTA_UPDATE_BOOT_PARTITION:
-                ESP_LOGI(TAG, "Boot partition updated. Next Partition: %d", *(esp_partition_subtype_t *)event_data);
-                break;
-            case ESP_HTTPS_OTA_FINISH:
-                ESP_LOGI(TAG, "OTA finish");
-                break;
-            case ESP_HTTPS_OTA_ABORT:
-                ESP_LOGI(TAG, "OTA abort");
-                break;
-        }
-    }
-}
 
 // Initialize the button GPIO pin
 void init_button(void)
@@ -120,7 +83,6 @@ void simple_ota_example_task(void *pvParameter)
 #else
         .cert_pem = (char *)server_cert_pem_start,
 #endif
-        .event_handler = _https_ota_event_handler,
         .keep_alive_enable = true,
 
 };
@@ -154,7 +116,7 @@ void blink_led_task(void *pvParameter)
         vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for 1 second
 
         gpio_set_level(GPIO_LED_PIN, 0);  // Turn LED OFF
-        ESP_LOGI(TAG, "LED OFF [%d] and message printed...",GPIO_LED_PIN);
+        ESP_LOGI(TAG, "LED [%d] OFF and message printed...",GPIO_LED_PIN);
         vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for 1 second
     }
 }

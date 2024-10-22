@@ -12,7 +12,7 @@
         "interface/ftdi/esp32_devkitj_v1.cfg",
         "target/esp32.cfg"
     ],
-    "idf.portWin": "COM20",
+    "idf.portWin": "COM13",
     "idf.pythonBinPathWin": "c:\\Users\\fabio\\.espressif\\python_env\\idf5.2_py3.11_env\\Scripts\\python.exe",
     "idf.toolsPathWin": "c:\\Users\\fabio\\.espressif",
     "idf.buildPathWin": "${workspaceFolder}\\build",
@@ -23,6 +23,7 @@
         "esp_app_desc.h": "c",
         "esp_https_ota.h": "c",
         "esp_http_client.h": "c",
-        "esp_log.h": "c"
+        "esp_log.h": "c",
+        "protocol_examples_common.h": "c"
     }
 }
