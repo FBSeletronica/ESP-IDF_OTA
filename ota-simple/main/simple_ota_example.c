@@ -31,7 +31,7 @@
 
 // Define the GPIO pin for the button and LED
 #define GPIO_BUTTON_PIN 0  // Button pin, GPIO0
-#define GPIO_LED_PIN 33     // LED pin, GPIO33
+#define GPIO_LED_PIN 21     // LED pin, GPIO33
 
 static const char *TAG = "simple_ota_example";
 extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");

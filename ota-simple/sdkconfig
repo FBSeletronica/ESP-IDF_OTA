@@ -436,8 +436,8 @@ CONFIG_PARTITION_TABLE_MD5=y
 #
 # Example Configuration
 #
-CONFIG_EXAMPLE_FIRMWARE_UPGRADE_URL="https://drive.google.com/u/0/uc?id=1eT7_jEJCj5J-fUJY86Bwv2YNQQP-iuNB&export=download"
-CONFIG_EXAMPLE_USE_CERT_BUNDLE=y
+CONFIG_EXAMPLE_FIRMWARE_UPGRADE_URL="https://raw.githubusercontent.com/FBSeletronica/ESP-IDF_OTA/main/ota-simple/bin/ota-simple.bin"
+# CONFIG_EXAMPLE_USE_CERT_BUNDLE is not set
 # end of Example Configuration
 
 #

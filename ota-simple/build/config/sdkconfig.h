@@ -336,8 +336,7 @@
 #define CONFIG_PARTITION_TABLE_FILENAME "partitions_two_ota.csv"
 #define CONFIG_PARTITION_TABLE_OFFSET 0x8000
 #define CONFIG_PARTITION_TABLE_MD5 1
-#define CONFIG_EXAMPLE_FIRMWARE_UPGRADE_URL "https://drive.google.com/u/0/uc?id=1eT7_jEJCj5J-fUJY86Bwv2YNQQP-iuNB&export=download"
-#define CONFIG_EXAMPLE_USE_CERT_BUNDLE 1
+#define CONFIG_EXAMPLE_FIRMWARE_UPGRADE_URL "https://raw.githubusercontent.com/FBSeletronica/ESP-IDF_OTA/main/ota-simple/bin/ota-simple.bin"
 #define CONFIG_ENV_GPIO_RANGE_MIN 0
 #define CONFIG_ENV_GPIO_RANGE_MAX 46
 #define CONFIG_ENV_GPIO_IN_RANGE_MAX 46
