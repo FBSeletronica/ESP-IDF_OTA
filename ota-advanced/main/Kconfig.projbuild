@@ -42,4 +42,13 @@ menu "Example Configuration"
         help
             This options specifies HTTP request size. Number of bytes specified
             in this option will be downloaded in single HTTP request.
+
+    config EXAMPLE_USE_CERT_BUNDLE
+        bool "Enable certificate bundle"
+        default y
+        depends on MBEDTLS_CERTIFICATE_BUNDLE
+        help
+            Enable trusted root certificate bundle. This approach allows to have
+            OTA updates functional with any public server without requirement
+            to explicitly add its server certificate.
 endmenu

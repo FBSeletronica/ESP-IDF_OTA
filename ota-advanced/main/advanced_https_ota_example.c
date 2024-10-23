@@ -6,6 +6,7 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
+
 #include <string.h>
 #include <inttypes.h>
 #include "freertos/FreeRTOS.h"
@@ -20,6 +21,11 @@
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "protocol_examples_common.h"
+#include "driver/gpio.h"  // Library for GPIO handling
+
+#ifdef CONFIG_EXAMPLE_USE_CERT_BUNDLE
+#include "esp_crt_bundle.h"
+#endif
 
 #if CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK
 #include "esp_efuse.h"
@@ -33,11 +39,33 @@
 #include "ble_api.h"
 #endif
 
+#define GPIO_BUTTON_PIN 0  // Button pin, GPIO0
+#define DEBOUNCE_DELAY_MS 200  // Debounce time to avoid bouncing on the button
+
 static const char *TAG = "advanced_https_ota_example";
 extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
 
 #define OTA_URL_SIZE 256
+
+// Function for debouncing the button
+bool is_button_pressed()
+{
+    static uint32_t last_press_time = 0;
+    uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
+
+    // Check if the button is pressed (low level)
+    if (gpio_get_level(GPIO_BUTTON_PIN) == 0)
+    {
+        // Check if the debounce delay has passed
+        if (current_time - last_press_time > DEBOUNCE_DELAY_MS)
+        {
+            last_press_time = current_time;
+            return true;
+        }
+    }
+    return false;
+}
 
 /* Event handler for catching system events */
 static void event_handler(void* arg, esp_event_base_t event_base,
@@ -76,6 +104,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
+// Function to validate the image header of the new firmware
 static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
 {
     if (new_app_info == NULL) {
@@ -89,18 +118,15 @@ static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
     }
 
 #ifndef CONFIG_EXAMPLE_SKIP_VERSION_CHECK
+    // Check if the current version is the same as the new version
     if (memcmp(new_app_info->version, running_app_info.version, sizeof(new_app_info->version)) == 0) {
-        ESP_LOGW(TAG, "Current running version is the same as a new. We will not continue the update.");
+        ESP_LOGW(TAG, "Current running version is the same as the new one. We will not continue the update.");
         return ESP_FAIL;
     }
 #endif
 
 #ifdef CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK
-    /**
-     * Secure version check from firmware image header prevents subsequent download and flash write of
-     * entire firmware image. However this is optional because it is also taken care in API
-     * esp_https_ota_finish at the end of OTA update procedure.
-     */
+    // Check for security version to prevent rollback to insecure versions
     const uint32_t hw_sec_version = esp_efuse_read_secure_version();
     if (new_app_info->secure_version < hw_sec_version) {
         ESP_LOGW(TAG, "New firmware security version is less than eFuse programmed, %"PRIu32" < %"PRIu32, new_app_info->secure_version, hw_sec_version);
@@ -111,53 +137,39 @@ static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
     return ESP_OK;
 }
 
+// Function to initialize HTTP client (optional customization)
 static esp_err_t _http_client_init_cb(esp_http_client_handle_t http_client)
 {
     esp_err_t err = ESP_OK;
-    /* Uncomment to add custom headers to HTTP request */
+    // Uncomment the following line to add custom headers to the HTTP request
     // err = esp_http_client_set_header(http_client, "Custom-Header", "Value");
     return err;
 }
 
+// OTA task to perform HTTPS OTA update
 void advanced_ota_example_task(void *pvParameter)
 {
     ESP_LOGI(TAG, "Starting Advanced OTA example");
 
     esp_err_t ota_finish_err = ESP_OK;
     esp_http_client_config_t config = {
-        .url = CONFIG_EXAMPLE_FIRMWARE_UPGRADE_URL,
+        .url = CONFIG_EXAMPLE_FIRMWARE_UPGRADE_URL,  // URL for the OTA update
+#ifdef CONFIG_EXAMPLE_USE_CERT_BUNDLE
+        .crt_bundle_attach = esp_crt_bundle_attach,
+#else
         .cert_pem = (char *)server_cert_pem_start,
+#endif
         .timeout_ms = CONFIG_EXAMPLE_OTA_RECV_TIMEOUT,
         .keep_alive_enable = true,
     };
 
-#ifdef CONFIG_EXAMPLE_FIRMWARE_UPGRADE_URL_FROM_STDIN
-    char url_buf[OTA_URL_SIZE];
-    if (strcmp(config.url, "FROM_STDIN") == 0) {
-        example_configure_stdin_stdout();
-        fgets(url_buf, OTA_URL_SIZE, stdin);
-        int len = strlen(url_buf);
-        url_buf[len - 1] = '\0';
-        config.url = url_buf;
-    } else {
-        ESP_LOGE(TAG, "Configuration mismatch: wrong firmware upgrade image url");
-        abort();
-    }
-#endif
-
-#ifdef CONFIG_EXAMPLE_SKIP_COMMON_NAME_CHECK
-    config.skip_cert_common_name_check = true;
-#endif
-
+    // OTA configuration
     esp_https_ota_config_t ota_config = {
         .http_config = &config,
-        .http_client_init_cb = _http_client_init_cb, // Register a callback to be invoked after esp_http_client is initialized
-#ifdef CONFIG_EXAMPLE_ENABLE_PARTIAL_HTTP_DOWNLOAD
-        .partial_http_download = true,
-        .max_http_request_size = CONFIG_EXAMPLE_HTTP_REQUEST_SIZE,
-#endif
+        .http_client_init_cb = _http_client_init_cb,
     };
 
+    // Start the OTA process
     esp_https_ota_handle_t https_ota_handle = NULL;
     esp_err_t err = esp_https_ota_begin(&ota_config, &https_ota_handle);
     if (err != ESP_OK) {
@@ -165,6 +177,7 @@ void advanced_ota_example_task(void *pvParameter)
         vTaskDelete(NULL);
     }
 
+    // Get and validate the image description of the new firmware
     esp_app_desc_t app_desc;
     err = esp_https_ota_get_img_desc(https_ota_handle, &app_desc);
     if (err != ESP_OK) {
@@ -173,30 +186,28 @@ void advanced_ota_example_task(void *pvParameter)
     }
     err = validate_image_header(&app_desc);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "image header verification failed");
+        ESP_LOGE(TAG, "Image header verification failed");
         goto ota_end;
     }
 
+    // Perform the OTA process (download and write to flash)
     while (1) {
         err = esp_https_ota_perform(https_ota_handle);
         if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
             break;
         }
-        // esp_https_ota_perform returns after every read operation which gives user the ability to
-        // monitor the status of OTA upgrade by calling esp_https_ota_get_image_len_read, which gives length of image
-        // data read so far.
         ESP_LOGD(TAG, "Image bytes read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
     }
 
+    // Check if the entire OTA data was received
     if (esp_https_ota_is_complete_data_received(https_ota_handle) != true) {
-        // the OTA image was not completely received and user can customise the response to this situation.
         ESP_LOGE(TAG, "Complete data was not received.");
     } else {
         ota_finish_err = esp_https_ota_finish(https_ota_handle);
         if ((err == ESP_OK) && (ota_finish_err == ESP_OK)) {
             ESP_LOGI(TAG, "ESP_HTTPS_OTA upgrade successful. Rebooting ...");
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            esp_restart();
+            vTaskDelay(1000 / portTICK_PERIOD_MS);  // Delay for stability before rebooting
+            esp_restart();  // Restart the ESP32 to apply the new firmware
         } else {
             if (ota_finish_err == ESP_ERR_OTA_VALIDATE_FAILED) {
                 ESP_LOGE(TAG, "Image validation failed, image is corrupted");
@@ -212,69 +223,51 @@ ota_end:
     vTaskDelete(NULL);
 }
 
+
+// Initialize the button GPIO pin
+void init_button(void)
+{
+    gpio_config_t io_conf = {
+        .intr_type = GPIO_INTR_DISABLE,  // No interrupt on the pin
+        .mode = GPIO_MODE_INPUT,         // Set the pin as input
+        .pin_bit_mask = (1ULL << GPIO_BUTTON_PIN), // Set the pin mask for the button
+        .pull_up_en = 1                  // Enable pull-up resistor
+    };
+    gpio_config(&io_conf);
+}
+
+// Main function (entry point)
 void app_main(void)
 {
     ESP_LOGI(TAG, "OTA example app_main start");
-    // Initialize NVS.
+
+    // Initialize NVS (Non-Volatile Storage)
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        // 1.OTA app partition table has a smaller NVS partition size than the non-OTA
-        // partition table. This size mismatch may cause NVS initialization to fail.
-        // 2.NVS partition contains data in new format and cannot be recognized by this version of code.
-        // If this happens, we erase NVS partition and initialize NVS again.
         ESP_ERROR_CHECK(nvs_flash_erase());
         err = nvs_flash_init();
     }
     ESP_ERROR_CHECK( err );
 
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    ESP_ERROR_CHECK(esp_netif_init());  // Initialize network interface
+    ESP_ERROR_CHECK(esp_event_loop_create_default());  // Create the default event loop
+
+    // Configure the GPIO for the OTA button
+    init_button();
 
     ESP_ERROR_CHECK(esp_event_handler_register(ESP_HTTPS_OTA_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
-    /* This helper function configures Wi-Fi or Ethernet, as selected in menuconfig.
-     * Read "Establishing Wi-Fi or Ethernet Connection" section in
-     * examples/protocols/README.md for more information about this function.
-    */
+
+    // Connect to Wi-Fi or Ethernet (based on configuration)
     ESP_ERROR_CHECK(example_connect());
 
-#if defined(CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE)
-    /**
-     * We are treating successful WiFi connection as a checkpoint to cancel rollback
-     * process and mark newly updated firmware image as active. For production cases,
-     * please tune the checkpoint behavior per end application requirement.
-     */
-    const esp_partition_t *running = esp_ota_get_running_partition();
-    esp_ota_img_states_t ota_state;
-    if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
-        if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
-            if (esp_ota_mark_app_valid_cancel_rollback() == ESP_OK) {
-                ESP_LOGI(TAG, "App is valid, rollback cancelled successfully");
-            } else {
-                ESP_LOGE(TAG, "Failed to cancel rollback");
-            }
+    // Main loop to check button press and start OTA
+    while (1) {
+        if (is_button_pressed()) {
+            ESP_LOGI(TAG, "Button pressed! Starting OTA...");
+            // Create OTA task when button is pressed
+            xTaskCreate(&advanced_ota_example_task, "advanced_ota_example_task", 1024 * 8, NULL, 5, NULL);
+            break;
         }
+        vTaskDelay(100 / portTICK_PERIOD_MS);  // Delay between button checks (100 ms)
     }
-#endif
-
-#if CONFIG_EXAMPLE_CONNECT_WIFI
-#if !CONFIG_BT_ENABLED
-    /* Ensure to disable any WiFi power save mode, this allows best throughput
-     * and hence timings for overall OTA operation.
-     */
-    esp_wifi_set_ps(WIFI_PS_NONE);
-#else
-    /* WIFI_PS_MIN_MODEM is the default mode for WiFi Power saving. When both
-     * WiFi and Bluetooth are running, WiFI modem has to go down, hence we
-     * need WIFI_PS_MIN_MODEM. And as WiFi modem goes down, OTA download time
-     * increases.
-     */
-    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
-#endif // CONFIG_BT_ENABLED
-#endif // CONFIG_EXAMPLE_CONNECT_WIFI
-
-#if CONFIG_BT_CONTROLLER_ENABLED && (CONFIG_BT_BLE_ENABLED || CONFIG_BT_NIMBLE_ENABLED)
-    ESP_ERROR_CHECK(esp_ble_helper_init());
-#endif
-
-    xTaskCreate(&advanced_ota_example_task, "advanced_ota_example_task", 1024 * 8, NULL, 5, NULL);
 }
