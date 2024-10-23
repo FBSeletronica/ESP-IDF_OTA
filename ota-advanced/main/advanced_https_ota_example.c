@@ -9,15 +9,18 @@
 
 #include <string.h>
 #include <inttypes.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
+
 #include "esp_system.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_ota_ops.h"
 #include "esp_http_client.h"
 #include "esp_https_ota.h"
+
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "protocol_examples_common.h"
@@ -27,28 +30,18 @@
 #include "esp_crt_bundle.h"
 #endif
 
-#if CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK
-#include "esp_efuse.h"
-#endif
-
 #if CONFIG_EXAMPLE_CONNECT_WIFI
 #include "esp_wifi.h"
 #endif
 
-#if CONFIG_BT_BLE_ENABLED || CONFIG_BT_NIMBLE_ENABLED
-#include "ble_api.h"
-#endif
-
 // Define the GPIO pin for the button and LED
-#define GPIO_LED_PIN 2     // LED pin, GPIO33
+#define GPIO_LED_PIN 21     // LED pin, GPIO33
 #define GPIO_BUTTON_PIN 0  // Button pin, GPIO0
 #define DEBOUNCE_DELAY_MS 200  // Debounce time to avoid bouncing on the button
 
 static const char *TAG = "advanced_https_ota_example";
 extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
-
-#define OTA_URL_SIZE 256
 
 // Function for debouncing the button
 bool is_button_pressed()
@@ -67,6 +60,31 @@ bool is_button_pressed()
         }
     }
     return false;
+}
+
+// Initialize the button GPIO pin
+void init_button(void)
+{
+    gpio_config_t io_conf = {
+        .intr_type = GPIO_INTR_DISABLE,  // No interrupt on the pin
+        .mode = GPIO_MODE_INPUT,         // Set the pin as input
+        .pin_bit_mask = (1ULL << GPIO_BUTTON_PIN), // Set the pin mask for the button
+        .pull_up_en = 1                  // Enable pull-up resistor
+    };
+    gpio_config(&io_conf);
+}
+
+// Initialize the LED GPIO pin
+void init_led(void)
+{
+    gpio_config_t io_conf = {
+        .intr_type = GPIO_INTR_DISABLE,  // No interrupt on the pin
+        .mode = GPIO_MODE_OUTPUT,        // Set the pin as output for the LED
+        .pin_bit_mask = (1ULL << GPIO_LED_PIN), // Set the pin mask for the LED
+        .pull_down_en = 0,               // Disable pull-down resistor
+        .pull_up_en = 0                  // Disable pull-up resistor
+    };
+    gpio_config(&io_conf);
 }
 
 /* Event handler for catching system events */
@@ -127,25 +145,7 @@ static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
     }
 #endif
 
-#ifdef CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK
-    // Check for security version to prevent rollback to insecure versions
-    const uint32_t hw_sec_version = esp_efuse_read_secure_version();
-    if (new_app_info->secure_version < hw_sec_version) {
-        ESP_LOGW(TAG, "New firmware security version is less than eFuse programmed, %"PRIu32" < %"PRIu32, new_app_info->secure_version, hw_sec_version);
-        return ESP_FAIL;
-    }
-#endif
-
     return ESP_OK;
-}
-
-// Function to initialize HTTP client (optional customization)
-static esp_err_t _http_client_init_cb(esp_http_client_handle_t http_client)
-{
-    esp_err_t err = ESP_OK;
-    // Uncomment the following line to add custom headers to the HTTP request
-    // err = esp_http_client_set_header(http_client, "Custom-Header", "Value");
-    return err;
 }
 
 // OTA task to perform HTTPS OTA update
@@ -167,8 +167,8 @@ void advanced_ota_example_task(void *pvParameter)
 
     // OTA configuration
     esp_https_ota_config_t ota_config = {
+        .bulk_flash_erase = true,
         .http_config = &config,
-        .http_client_init_cb = _http_client_init_cb,
     };
 
     // Start the OTA process
@@ -225,33 +225,6 @@ ota_end:
     vTaskDelete(NULL);
 }
 
-
-// Initialize the button GPIO pin
-void init_button(void)
-{
-    gpio_config_t io_conf = {
-        .intr_type = GPIO_INTR_DISABLE,  // No interrupt on the pin
-        .mode = GPIO_MODE_INPUT,         // Set the pin as input
-        .pin_bit_mask = (1ULL << GPIO_BUTTON_PIN), // Set the pin mask for the button
-        .pull_up_en = 1                  // Enable pull-up resistor
-    };
-    gpio_config(&io_conf);
-}
-
-// Initialize the LED GPIO pin
-void init_led(void)
-{
-    gpio_config_t io_conf = {
-        .intr_type = GPIO_INTR_DISABLE,  // No interrupt on the pin
-        .mode = GPIO_MODE_OUTPUT,        // Set the pin as output for the LED
-        .pin_bit_mask = (1ULL << GPIO_LED_PIN), // Set the pin mask for the LED
-        .pull_down_en = 0,               // Disable pull-down resistor
-        .pull_up_en = 0                  // Disable pull-up resistor
-    };
-    gpio_config(&io_conf);
-}
-
-
 // Task to blink the LED and print a message every 1 second
 void blink_led_task(void *pvParameter)
 {
@@ -286,14 +259,11 @@ void app_main(void)
 
     ESP_ERROR_CHECK(esp_netif_init());  // Initialize network interface
     ESP_ERROR_CHECK(esp_event_loop_create_default());  // Create the default event loop
-
-
     ESP_ERROR_CHECK(esp_event_handler_register(ESP_HTTPS_OTA_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
 
     // Connect to Wi-Fi or Ethernet (based on configuration)
     ESP_ERROR_CHECK(example_connect());
-
-
+    
     // Create LED blink task
     xTaskCreate(&blink_led_task, "blink_led_task", 2048, NULL, 5, NULL);
 
@@ -302,8 +272,7 @@ void app_main(void)
         if (is_button_pressed()) {
             ESP_LOGI(TAG, "Button pressed! Starting OTA...");
             // Create OTA task when button is pressed
-            xTaskCreate(&advanced_ota_example_task, "advanced_ota_example_task", 1024 * 8, NULL, 5, NULL);
-            break;
+            xTaskCreate(&advanced_ota_example_task, "advanced_ota_example_task", 8192, NULL, 5, NULL);
         }
         vTaskDelay(100 / portTICK_PERIOD_MS);  // Delay between button checks (100 ms)
     }

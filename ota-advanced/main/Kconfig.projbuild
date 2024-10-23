@@ -6,10 +6,6 @@ menu "Example Configuration"
         help
             URL of server which hosts the firmware image.
 
-    config EXAMPLE_FIRMWARE_UPGRADE_URL_FROM_STDIN
-        bool
-        default y if EXAMPLE_FIRMWARE_UPGRADE_URL = "FROM_STDIN"
-
     config EXAMPLE_SKIP_COMMON_NAME_CHECK
         bool "Skip server certificate CN fieldcheck"
         default n

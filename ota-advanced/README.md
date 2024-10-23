@@ -7,7 +7,5 @@ This example is based on `esp_https_ota` component's APIs.
 
 ## Configuration
 
-Refer README.md in the parent directory for setup details
-
-
+Github URL
 https://raw.githubusercontent.com/FBSeletronica/ESP-IDF_OTA/main/ota-advanced/bin/ota-advanced.bin
