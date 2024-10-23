@@ -39,6 +39,8 @@
 #include "ble_api.h"
 #endif
 
+// Define the GPIO pin for the button and LED
+#define GPIO_LED_PIN 2     // LED pin, GPIO33
 #define GPIO_BUTTON_PIN 0  // Button pin, GPIO0
 #define DEBOUNCE_DELAY_MS 200  // Debounce time to avoid bouncing on the button
 
@@ -236,6 +238,35 @@ void init_button(void)
     gpio_config(&io_conf);
 }
 
+// Initialize the LED GPIO pin
+void init_led(void)
+{
+    gpio_config_t io_conf = {
+        .intr_type = GPIO_INTR_DISABLE,  // No interrupt on the pin
+        .mode = GPIO_MODE_OUTPUT,        // Set the pin as output for the LED
+        .pin_bit_mask = (1ULL << GPIO_LED_PIN), // Set the pin mask for the LED
+        .pull_down_en = 0,               // Disable pull-down resistor
+        .pull_up_en = 0                  // Disable pull-up resistor
+    };
+    gpio_config(&io_conf);
+}
+
+
+// Task to blink the LED and print a message every 1 second
+void blink_led_task(void *pvParameter)
+{
+    while (1) {
+        // Toggle the LED state
+        gpio_set_level(GPIO_LED_PIN, 1);  // Turn LED ON
+        ESP_LOGI(TAG, "LED [%d] ON and message printed...",GPIO_LED_PIN);
+        vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for 1 second
+
+        gpio_set_level(GPIO_LED_PIN, 0);  // Turn LED OFF
+        ESP_LOGI(TAG, "LED [%d] OFF and message printed...",GPIO_LED_PIN);
+        vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for 1 second
+    }
+}
+
 // Main function (entry point)
 void app_main(void)
 {
@@ -249,16 +280,22 @@ void app_main(void)
     }
     ESP_ERROR_CHECK( err );
 
+    // Initialize button and LED
+    init_button();
+    init_led();
+
     ESP_ERROR_CHECK(esp_netif_init());  // Initialize network interface
     ESP_ERROR_CHECK(esp_event_loop_create_default());  // Create the default event loop
 
-    // Configure the GPIO for the OTA button
-    init_button();
 
     ESP_ERROR_CHECK(esp_event_handler_register(ESP_HTTPS_OTA_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
 
     // Connect to Wi-Fi or Ethernet (based on configuration)
     ESP_ERROR_CHECK(example_connect());
+
+
+    // Create LED blink task
+    xTaskCreate(&blink_led_task, "blink_led_task", 2048, NULL, 5, NULL);
 
     // Main loop to check button press and start OTA
     while (1) {
