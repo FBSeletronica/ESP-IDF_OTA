@@ -35,7 +35,7 @@
 #endif
 
 // Define the GPIO pin for the button and LED
-#define GPIO_LED_PIN 21     // LED pin, GPIO33
+#define GPIO_LED_PIN 33     // LED pin, GPIO33
 #define GPIO_BUTTON_PIN 0  // Button pin, GPIO0
 #define DEBOUNCE_DELAY_MS 200  // Debounce time to avoid bouncing on the button
 
@@ -169,6 +169,10 @@ void advanced_ota_example_task(void *pvParameter)
     esp_https_ota_config_t ota_config = {
         .bulk_flash_erase = true,
         .http_config = &config,
+#ifdef CONFIG_EXAMPLE_ENABLE_PARTIAL_HTTP_DOWNLOAD
+        .partial_http_download = true,
+        .max_http_request_size = CONFIG_EXAMPLE_HTTP_REQUEST_SIZE,
+#endif
     };
 
     // Start the OTA process
@@ -244,6 +248,28 @@ void blink_led_task(void *pvParameter)
 void app_main(void)
 {
     ESP_LOGI(TAG, "OTA example app_main start");
+
+    const esp_partition_t *running_partition = esp_ota_get_running_partition();
+    esp_app_desc_t running_app_info;
+    if (esp_ota_get_partition_description(running_partition, &running_app_info) == ESP_OK) {
+        ESP_LOGI(TAG, "Firmware Information:");
+        ESP_LOGI(TAG, "  Version: %s", running_app_info.version);
+        ESP_LOGI(TAG, "  Project Name: %s", running_app_info.project_name);
+        ESP_LOGI(TAG, "  Compile Time: %s", running_app_info.time);
+        ESP_LOGI(TAG, "  Compile Date: %s", running_app_info.date);
+        ESP_LOGI(TAG, "  IDF Version: %s", running_app_info.idf_ver);
+        ESP_LOGI(TAG, "  Secure Version: %" PRIu32, running_app_info.secure_version);
+        ESP_LOGI(TAG, "  Magic Word: 0x%" PRIx32, running_app_info.magic_word);
+        ESP_LOGI(TAG, "  Minimal eFuse block revision: %d", running_app_info.min_efuse_blk_rev_full);
+        ESP_LOGI(TAG, "  Maximal eFuse block revision: %d", running_app_info.max_efuse_blk_rev_full);
+        ESP_LOGI(TAG, "  ELF SHA256: ");
+        for (int i = 0; i < sizeof(running_app_info.app_elf_sha256); i++) {
+            printf("%02x", running_app_info.app_elf_sha256[i]);
+        }
+        printf("\n");
+    } else {
+        ESP_LOGE(TAG, "Failed to get running firmware information");
+    }
 
     // Initialize NVS (Non-Volatile Storage)
     esp_err_t err = nvs_flash_init();
