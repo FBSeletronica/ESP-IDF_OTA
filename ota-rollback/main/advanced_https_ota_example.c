@@ -303,7 +303,7 @@ void app_main(void)
     ESP_ERROR_CHECK(example_connect());
     
     // Create LED blink task
-    xTaskCreate(&blink_led_task, "blink_led_task", 100, NULL, 5, NULL);
+    xTaskCreate(&blink_led_task, "blink_led_task", 10, NULL, 5, NULL);
 
     // Main loop to check button press and start OTA
     while (1) {
