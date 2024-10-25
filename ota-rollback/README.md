@@ -8,4 +8,4 @@ This example is based on `esp_https_ota` component's APIs.
 ## Configuration
 
 Github URL
-https://raw.githubusercontent.com/FBSeletronica/ESP-IDF_OTA/main/ota-advanced/bin/ota-advanced.bin
+https://raw.githubusercontent.com/FBSeletronica/ESP-IDF_OTA/main/ota-rollback/bin/ota-rollback.bin
