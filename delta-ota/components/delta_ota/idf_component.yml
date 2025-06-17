@@ -1,0 +1,5 @@
+dependencies:
+  espressif/esp_delta_ota:
+    version: 1.*
+description: Delta OTA Component
+version: 1.0.0

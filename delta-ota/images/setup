@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+import os
+import venv
+import subprocess
+from pathlib import Path
+
+_DIR = Path(__file__).parent
+_PROGRAM_DIR = _DIR
+_VENV_DIR = _PROGRAM_DIR / "python_env"
+
+# Get python env
+subprocess.check_call(["cp"] + ["-r", os.environ["IDF_PYTHON_ENV_PATH"], "python_env"])
+context = venv.EnvBuilder().ensure_directories(_VENV_DIR)
+
+# Upgrade dependencies
+pip = [context.env_exe, "-m", "pip"]
+subprocess.check_call(pip + ["install", "--upgrade", "pip"])
+subprocess.check_call(pip + ["install", "--upgrade", "setuptools", "wheel"])
+
+extras_str = "tools/requirements.txt"
+
+# Install requirements
+subprocess.check_call(pip + ["install", "-r", f"{_PROGRAM_DIR}/{extras_str}"])

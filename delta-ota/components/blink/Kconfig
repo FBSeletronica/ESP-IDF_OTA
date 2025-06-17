@@ -1,0 +1,15 @@
+menu "Blink Component"
+
+    config BLINK_LED_GPIO
+        int "LED GPIO"
+        default 21
+
+    config BLINK_TASK_PRIORITY
+        int "Blink Task Priority"
+        default 2
+
+    config BLINK_TASK_STACK_SIZE
+        int "Blink Task Stack Size in words"
+        default 2048
+
+endmenu
