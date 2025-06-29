@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+import sys
+import venv
+import subprocess
+from pathlib import Path
+
+_DIR = Path(__file__).parent
+_PROGRAM_DIR = _DIR
+_VENV_DIR = _PROGRAM_DIR / "python_env"
+
+context = venv.EnvBuilder().ensure_directories(_VENV_DIR)
+
+subprocess.check_call([context.env_exe, "tools/esp_delta_ota_patch_gen.py", "create_patch"] + sys.argv[1:])

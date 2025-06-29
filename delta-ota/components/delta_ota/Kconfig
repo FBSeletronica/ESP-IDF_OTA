@@ -1,0 +1,33 @@
+menu "Delta OTA Configuration"
+
+    config DOTA_FIRMWARE_UPG_URL
+        string "Firmware Upgrade URL"
+        default "https://192.168.20.194:8070/patch.bin"
+        help
+            URL of server which hosts the firmware image.
+
+    config DOTA_SKIP_COMMON_NAME_CHECK
+        bool "Skip server certificate CN fieldcheck"
+        default n
+        help
+            This allows you to skip the validation of OTA server certificate CN field.
+
+    config DOTA_OTA_RECV_TIMEOUT
+        int "OTA Receive Timeout"
+        default 5000
+        help
+            Maximum time for reception
+
+    config DOTA_GPIO_BUTTON
+        int "GPIO to trigger OTA"
+        default 0
+
+    config DOTA_TASK_PRIORITY
+        int "Delta OTA Task Priority"
+        default 5
+
+    config DOTA_TASK_STACK_SIZE
+        int "Delta OTA Task Stack Size in words"
+        default 8192
+
+endmenu
