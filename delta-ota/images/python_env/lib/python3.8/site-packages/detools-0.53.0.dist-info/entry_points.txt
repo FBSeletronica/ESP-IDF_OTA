@@ -1,0 +1,2 @@
+[console_scripts]
+detools = detools.__init__:_main
