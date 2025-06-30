@@ -17,7 +17,7 @@
 static const char *TAG = "blink_task";
 
 //#define BLINK_GPIO CONFIG_BLINK_LED_GPIO
-#define BLINK_GPIO 21
+#define BLINK_GPIO 2
 
 static uint8_t s_led_state = 0;
 
