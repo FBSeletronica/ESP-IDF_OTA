@@ -2,7 +2,7 @@ menu "Delta OTA Configuration"
 
     config DOTA_FIRMWARE_UPG_URL
         string "Firmware Upgrade URL"
-        default "https://192.168.20.194:8070/patch.bin"
+        default "https://raw.githubusercontent.com/FBSeletronica/ESP-IDF_OTA/main/delta-ota/images/https_delta_ota_patch.bin"
         help
             URL of server which hosts the firmware image.
 
